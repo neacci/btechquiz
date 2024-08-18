@@ -2,8 +2,10 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import { CountdownCircleTimer } from "react-countdown-circle-timer";
-import { RenderTime } from "./handlers";
+import Question from "./Question";
+import Timer from "./Timer";
+import Result from "./Result";
+import { fetchQuestions, generateOptions } from "./helpers";
 import "./App.css";
 
 function App() {
@@ -14,44 +16,23 @@ function App() {
   const [canAnswer, setCanAnswer] = useState(false);
   const [answers, setAnswers] = useState([]);
   const [countdownFinished, setCountdownFinished] = useState(false);
-  const [isComplated, setIsComplated] = useState(false);
+  const [isCompleted, setIsCompleted] = useState(false);
 
   useEffect(() => {
-    const fetchQuestions = async () => {
-      try {
-        const response = await axios.get(
-          "https://jsonplaceholder.typicode.com/posts"
-        );
-        const quizQuestions = response.data.slice(0, 10).map((item) => ({
-          question: item.title,
-          options: generateOptions(item.body),
-        }));
+    const initializeQuestions = async () => {
+      const quizQuestions = await fetchQuestions();
+      if (quizQuestions) {
         setQuestions(quizQuestions);
-      } catch (error) {
-        toast("Error fetching data.", {
-          type: "error",
-          theme: "dark",
-          position: "top-center",
-          autoClose: 2500,
-        });
-        console.error("Error fetching data:", error);
       }
     };
-    fetchQuestions();
+    initializeQuestions();
   }, []);
 
   useEffect(() => {
-    if (!countdownFinished && timeRemaining == 0) {
+    if (!countdownFinished && timeRemaining === 0) {
       handleNextQuestion();
     }
   }, [countdownFinished]);
-
-  const generateOptions = (bodyText) => {
-    const words = bodyText.split(" ").slice(0, 4); // first 4 words as options
-    return ["A", "B", "C", "D"].map(
-      (letter, index) => `${letter}. ${words[index]}`
-    );
-  };
 
   const handleAnswerSelection = (answer) => {
     if (canAnswer) {
@@ -73,7 +54,7 @@ function App() {
         setCountdownFinished(false);
       }, 500);
     } else {
-      setIsComplated(true);
+      setIsCompleted(true);
       toast("Quiz tamamlandı!", {
         type: "success",
         theme: "dark",
@@ -90,89 +71,27 @@ function App() {
   return (
     <div className="container">
       <div className="quiz-box">
-        {!isComplated && (
+        {!isCompleted ? (
           <>
-            <div className="quiz-header">
-              <h2>{questions[currentQuestion].question}</h2>
-            </div>
-            <div
-              className="flex justify-center mb-4"
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
-              <span className="question-number">
-                Soru {currentQuestion + 1}/10
-              </span>
-              <div className="button-group" style={{ marginBottom: "20px" }}>
-                <button
-                  className="btn btn-primary"
-                  onClick={handleNextQuestion}
-                  disabled={!canAnswer}
-                >
-                  Sonraki Soru
-                </button>
-              </div>
-            </div>
-            <div className="options-grid">
-              {questions[currentQuestion].options.map((option) => (
-                <button
-                  key={option}
-                  className={`option-button ${
-                    selectedAnswer === option ? "active" : ""
-                  }`}
-                  onClick={() => handleAnswerSelection(option)}
-                  disabled={!canAnswer}
-                >
-                  <span className="font-medium">{option.charAt(0)}</span>
-                  <span className="ml-2">{option.slice(3)}</span>
-                </button>
-              ))}
-            </div>
-            <div className="timer-wrapper">
-              {!countdownFinished && (
-                <CountdownCircleTimer
-                  isPlaying={!countdownFinished}
-                  duration={timeRemaining}
-                  onUpdate={(x) => {
-                    if (x < 20) {
-                      setCanAnswer(true);
-                    }
-                  }}
-                  onComplete={() => {
-                    handleNextQuestion();
-                  }}
-                  colors={["#004777", "#F7B801", "#A30000", "#A30000"]}
-                  colorsTime={[20, 15, 10, 0]}
-                >
-                  {RenderTime}
-                </CountdownCircleTimer>
-              )}
-            </div>
+            <Question
+              question={questions[currentQuestion].question}
+              options={questions[currentQuestion].options}
+              currentQuestion={currentQuestion}
+              totalQuestions={questions.length}
+              selectedAnswer={selectedAnswer}
+              handleAnswerSelection={handleAnswerSelection}
+              canAnswer={canAnswer}
+              handleNextQuestion={handleNextQuestion}
+            />
+            <Timer
+              timeRemaining={timeRemaining}
+              countdownFinished={countdownFinished}
+              setCanAnswer={setCanAnswer}
+              handleNextQuestion={handleNextQuestion}
+            />
           </>
-        )}
-        {isComplated && (
-          <div className="results">
-            <h2>Sonuçlar:</h2>
-            <table>
-              <thead>
-                <tr>
-                  <th>Soru</th>
-                  <th>Cevap</th>
-                </tr>
-              </thead>
-              <tbody>
-                {answers.map((answer, index) => (
-                  <tr key={index}>
-                    <td>Soru {index + 1}</td>
-                    <td>{answer}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        ) : (
+          <Result answers={answers} />
         )}
         <ToastContainer />
       </div>
